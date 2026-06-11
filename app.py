@@ -2,18 +2,6 @@
 Olivarda — Zeytinyağı Alım ve Cari Takip Uygulaması
 =====================================================
 Streamlit tabanlı, SQLite veritabanı kullanan web uygulaması.
-
-Özellikler:
- • Kurumsal kimlik (Olivarda / Erengül Zeytinyağı)
- • Güvenli giriş + "Beni Hatırla" (cookie token, 30 gün)
- • Müşteri yönetimi (aktif / pasif filtreleme)
- • Yağ alım kaydı (fotoğraf + kamera desteği)
- • Ödeme takibi (makbuz fotoğraf + kamera)
- • Depo & satış (asit bazlı stok, expander detaylar)
- • Müşteri detay (cari hesap özeti)
- • Kullanıcı yönetimi & işlem loglama (created_by)
- • Mobil uyumlu buton-tabanlı sidebar menü
- • Flash message sistemi (kayıt sonrası otomatik yenileme)
 """
 
 import streamlit as st
@@ -41,151 +29,17 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-OLIVE_GREEN = "#6B8E23"
-OLIVE_DARK = "#556B2F"
-
-# ============================================================
-# GLOBAL CSS
-# ============================================================
-st.markdown(f"""
-<style>
-/* --- Kurumsal Logo / Başlık --- */
-.brand-header {{
-    text-align: center;
-    padding: 8px 0 4px 0;
-}}
-.brand-name {{
-    font-size: 1.65rem;
-    font-weight: 800;
-    color: {OLIVE_GREEN};
-    letter-spacing: 1.5px;
-    line-height: 1.2;
-}}
-.brand-subtitle {{
-    font-size: 0.72rem;
-    color: #6c757d;
-    font-weight: 500;
-    letter-spacing: 0.3px;
-    margin-top: 2px;
-}}
-.brand-divider {{
-    width: 50px;
-    height: 3px;
-    background: {OLIVE_GREEN};
-    border-radius: 2px;
-    margin: 8px auto 0 auto;
-}}
-/* --- Footer --- */
-.sidebar-footer {{
-    text-align: center;
-    font-size: 0.65rem;
-    color: #adb5bd;
-    padding: 12px 0 4px 0;
-    border-top: 1px solid #e9ecef;
-    margin-top: 16px;
-}}
-/* --- KPI Kartları --- */
-.kpi-grid {{
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin: 12px 0 20px 0;
-}}
-.kpi-card {{
-    flex: 1 1 180px;
-    max-width: 100%;
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-top: 3px solid {OLIVE_GREEN};
-    border-radius: 12px;
-    padding: 16px 20px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    transition: box-shadow 0.2s ease;
-}}
-.kpi-card:hover {{
-    box-shadow: 0 3px 12px rgba(0,0,0,0.10);
-}}
-.kpi-label {{
-    font-size: 0.78rem;
-    color: #6c757d;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    font-weight: 600;
-    margin-bottom: 4px;
-}}
-.kpi-value {{
-    font-size: 1.45rem;
-    font-weight: 700;
-    color: #212529;
-    line-height: 1.2;
-}}
-.kpi-value.positive {{ color: #198754; }}
-.kpi-value.negative {{ color: #dc3545; }}
-.kpi-value.info     {{ color: {OLIVE_GREEN}; }}
-.kpi-value.warning  {{ color: #e67e22; }}
-@media (max-width: 640px) {{
-    .kpi-card  {{ flex: 1 1 100%; }}
-    .kpi-value {{ font-size: 1.25rem; }}
-}}
-/* --- Sidebar Menü Buton Stilleri --- */
-[data-testid="stSidebar"] .stButton > button {{
-    width: 100%;
-    text-align: left !important;
-    justify-content: flex-start !important;
-    padding: 14px 16px !important;
-    margin-bottom: 4px !important;
-    font-size: 0.95rem !important;
-    font-weight: 500 !important;
-    border: 1px solid transparent !important;
-    border-radius: 10px !important;
-    background: transparent !important;
-    color: #495057 !important;
-    transition: all 0.2s ease !important;
-    min-height: 48px !important;
-    line-height: 1.3 !important;
-}}
-[data-testid="stSidebar"] .stButton > button:hover {{
-    background: rgba(107,142,35,0.08) !important;
-    border-color: rgba(107,142,35,0.2) !important;
-    color: {OLIVE_GREEN} !important;
-}}
-[data-testid="stSidebar"] .stButton > button:active,
-[data-testid="stSidebar"] .stButton > button:focus {{
-    background: rgba(107,142,35,0.12) !important;
-    border-color: {OLIVE_GREEN} !important;
-    color: {OLIVE_GREEN} !important;
-    box-shadow: none !important;
-}}
-</style>
-""", unsafe_allow_html=True)
-
 
 # ============================================================
 # YARDIMCI FONKSİYONLAR
 # ============================================================
 
 def get_cookie_manager():
-    """session_state'te saklanan tek CookieManager instance'ını döndürür."""
+    """main() içinde oluşturulan tekil CookieManager'ı döndürür."""
     return st.session_state.get("_cookie_manager")
 
 
-def render_kpi_cards(cards: list):
-    """cards: [{icon, label, value, color}, ...]  color: positive|negative|info|warning|''"""
-    html = '<div class="kpi-grid">'
-    for c in cards:
-        cls = c.get("color", "")
-        html += (
-            f'<div class="kpi-card">'
-            f'<div class="kpi-label">{c.get("icon","")} {c["label"]}</div>'
-            f'<div class="kpi-value {cls}">{c["value"]}</div>'
-            f'</div>'
-        )
-    html += '</div>'
-    st.markdown(html, unsafe_allow_html=True)
-
-
 def show_flash_message():
-    """session_state'te bekleyen flash mesajı gösterir ve temizler."""
     if "flash_success" in st.session_state:
         st.success(st.session_state.pop("flash_success"))
     if "flash_error" in st.session_state:
@@ -584,7 +438,6 @@ def get_acidity_details(acidity):
 
 
 def get_stock_by_acidity():
-    """Asit derecesine göre net stok: Alım − Satış."""
     conn = get_db()
     rows = conn.execute("""
         SELECT acidity,
@@ -676,14 +529,8 @@ def get_dashboard_stats():
 def render_login():
     cookie_manager = get_cookie_manager()
 
-    st.markdown("""
-    <div class="brand-header">
-        <div class="brand-name">🫒 Olivarda</div>
-        <div class="brand-subtitle">Erengül Zeytinyağı Ticareti</div>
-        <div class="brand-divider"></div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.write("")
+    st.markdown("## 🫒 Olivarda")
+    st.caption("Erengül Zeytinyağı Ticareti")
     st.divider()
 
     username = st.text_input("Kullanıcı Adı", placeholder="admin")
@@ -704,7 +551,7 @@ def render_login():
             st.session_state["authenticated"] = True
             st.session_state["username"] = user["username"]
             if remember_me:
-                token = create_auth_token(username)
+                token = create_auth_token(user["username"])
                 cookie_manager.set(
                     "olivarda_auth_token", token,
                     expires_at=datetime.now() + timedelta(days=TOKEN_EXPIRY_DAYS),
@@ -722,42 +569,45 @@ def render_login():
 
 def render_dashboard():
     st.header("📊 Genel Bakış")
-    st.caption("Tüm işlemlerinizin özet görünümü")
+    show_flash_message()
 
     stats = get_dashboard_stats()
 
-    render_kpi_cards([
-        {"icon": "👥", "label": "Toplam Müşteri",      "value": stats["total_customers"],                          "color": "info"},
-        {"icon": "🛢️", "label": "Toplam Alınan Yağ",   "value": format_kg(stats["total_kg"])},
-        {"icon": "📦", "label": "Depoda Kalan Yağ",     "value": format_kg(stats["net_stock_kg"]),                  "color": "info"},
-        {"icon": "💰", "label": "Toplam Hak Ediş",      "value": format_currency(stats["total_purchase_amount"]),   "color": "warning"},
-        {"icon": "💸", "label": "Toplam Ödenen",         "value": format_currency(stats["total_paid"]),              "color": "positive"},
-        {"icon": "📋", "label": "Kalan Bakiye",          "value": format_currency(stats["total_balance"]),
-         "color": "negative" if stats["total_balance"] > 0 else "positive"},
-        {"icon": "🏷️", "label": "Toplam Satış Geliri",  "value": format_currency(stats["total_sale_amount"]),       "color": "positive"},
-    ])
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("👥 Toplam Müşteri", stats["total_customers"])
+    c2.metric("🛢️ Toplam Alınan Yağ", format_kg(stats["total_kg"]))
+    c3.metric("📦 Depoda Kalan", format_kg(stats["net_stock_kg"]))
+    c4.metric("🏷️ Satış Geliri", format_currency(stats["total_sale_amount"]))
+
+    c5, c6, c7 = st.columns(3)
+    c5.metric("💰 Toplam Hak Ediş", format_currency(stats["total_purchase_amount"]))
+    c6.metric("💸 Toplam Ödenen", format_currency(stats["total_paid"]))
+    c7.metric("📋 Kalan Bakiye", format_currency(stats["total_balance"]))
 
     st.divider()
 
-    st.subheader("🕐 Son Yağ Alımları")
-    recent = get_oil_purchases()[:5]
-    if recent:
-        for p in recent:
-            with st.container(border=True):
-                st.write(f"**{p['customer_name']}** — {format_currency(p['total_amount'])}")
-                st.caption(f"{p['purchase_date']} · {format_kg(p['kg'])} · Asit: %{p['acidity'] or '-'}")
-    else:
-        st.info("Henüz yağ alım kaydı yok.")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.subheader("🕐 Son Yağ Alımları")
+        recent = get_oil_purchases()[:5]
+        if recent:
+            for p in recent:
+                with st.container(border=True):
+                    st.write(f"**{p['customer_name']}** — {format_currency(p['total_amount'])}")
+                    st.caption(f"{p['purchase_date']} · {format_kg(p['kg'])} · Asit: %{p['acidity'] or '-'}")
+        else:
+            st.info("Henüz yağ alım kaydı yok.")
 
-    st.subheader("💸 Son Ödemeler")
-    recent_pay = get_payments()[:5]
-    if recent_pay:
-        for p in recent_pay:
-            with st.container(border=True):
-                st.write(f"**{p['customer_name']}** — {format_currency(p['amount'])}")
-                st.caption(f"{p['payment_date']} · {p['payment_type']}")
-    else:
-        st.info("Henüz ödeme kaydı yok.")
+    with col_b:
+        st.subheader("💸 Son Ödemeler")
+        recent_pay = get_payments()[:5]
+        if recent_pay:
+            for p in recent_pay:
+                with st.container(border=True):
+                    st.write(f"**{p['customer_name']}** — {format_currency(p['amount'])}")
+                    st.caption(f"{p['payment_date']} · {p['payment_type']}")
+        else:
+            st.info("Henüz ödeme kaydı yok.")
 
 
 # ============================================================
@@ -766,54 +616,67 @@ def render_dashboard():
 
 def render_customers():
     st.header("👥 Müşteri Yönetimi")
-    st.caption("Müşterilerinizi ekleyin ve cari hesaplarını takip edin")
     show_flash_message()
 
-    tab_list, tab_new = st.tabs(["📋 Müşteri Listesi", "➕ Yeni Müşteri"])
+    if "customers_tab" not in st.session_state:
+        st.session_state["customers_tab"] = "📋 Müşteri Listesi"
+
+    tab = st.radio(
+        "Gezinme", ["📋 Müşteri Listesi", "➕ Yeni Müşteri"],
+        horizontal=True, key="customers_tab", label_visibility="collapsed",
+    )
+    st.divider()
 
     # --- LİSTE ---
-    with tab_list:
+    if tab == "📋 Müşteri Listesi":
         summaries = get_customer_summary()
         if not summaries:
-            st.info("Henüz müşteri eklenmemiş. '➕ Yeni Müşteri' sekmesinden ekleyebilirsiniz.")
+            st.info("Henüz müşteri eklenmemiş. '➕ Yeni Müşteri' sekmesine geçerek ekleyebilirsiniz.")
         else:
-            search = st.text_input("🔍 Müşteri Ara", placeholder="İsim veya telefon ile arayın...")
+            search = st.text_input("🔍 Müşteri Ara", placeholder="İsim, telefon veya adres ile arayın...")
+
             for row in summaries:
                 if search:
                     q = search.lower()
-                    if q not in row["name"].lower() and q not in (row["phone"] or "").lower():
+                    if (q not in row["name"].lower()
+                            and q not in (row["phone"] or "").lower()
+                            and q not in (row["address"] or "").lower()):
                         continue
 
                 balance = row["balance"]
-                badge = (
-                    f"🔴 Borç: {format_currency(balance)}" if balance > 0
-                    else f"🟢 Alacak: {format_currency(abs(balance))}" if balance < 0
-                    else "✅ Hesap Kapalı"
-                )
-                status_val = row["durum"] if row["durum"] is not None else 1
-                status_text = "🟢 Aktif" if status_val == 1 else "🔴 Pasif"
+                if balance > 0:
+                    badge = f"🔴 Borç: {format_currency(balance)}"
+                elif balance < 0:
+                    badge = f"🟢 Alacak: {format_currency(abs(balance))}"
+                else:
+                    badge = "✅ Hesap Kapalı"
 
-                with st.container(border=True):
-                    st.write(f"**{row['name']}**  ({status_text})")
-                    st.caption(f"📞 {row['phone'] or '—'}  ·  📍 {row['address'] or '—'}")
-                    st.write(badge)
+                status_val = row["durum"] if row["durum"] is not None else 1
+                status_icon = "🟢" if status_val == 1 else "🔴"
+
+                with st.expander(f"{status_icon} {row['name']}  —  {badge}"):
+                    st.write(f"📞 **Telefon:** {row['phone'] or '—'}")
+                    st.write(f"📍 **Adres:** {row['address'] or '—'}")
                     st.caption(
                         f"🛢️ Yağ: {format_kg(row['total_kg'])}  ·  "
                         f"💰 Hak Ediş: {format_currency(row['total_purchase_amount'])}  ·  "
-                        f"💸 Ödenen: {format_currency(row['total_paid'])}  ·  "
-                        f"📋 Bakiye: {format_currency(balance)}"
+                        f"💸 Ödenen: {format_currency(row['total_paid'])}"
                     )
-                    if st.button("🔄 Durumu Değiştir", key=f"toggle_{row['id']}"):
-                        toggle_customer_status(row["id"], status_val)
-                        st.session_state["flash_success"] = f"✅ {row['name']} durumu güncellendi."
-                        st.rerun()
-                    if st.button("🗑️ Sil", key=f"del_cust_{row['id']}"):
-                        delete_customer(row["id"])
-                        st.session_state["flash_success"] = f"✅ {row['name']} silindi."
-                        st.rerun()
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        btn_label = "🔴 Pasife Al" if status_val == 1 else "🟢 Aktife Al"
+                        if st.button(btn_label, key=f"toggle_{row['id']}", use_container_width=True):
+                            toggle_customer_status(row["id"], status_val)
+                            st.session_state["flash_success"] = f"✅ {row['name']} durumu güncellendi."
+                            st.rerun()
+                    with col2:
+                        if st.button("🗑️ Sil", key=f"del_cust_{row['id']}", use_container_width=True):
+                            delete_customer(row["id"])
+                            st.session_state["flash_success"] = f"✅ {row['name']} silindi."
+                            st.rerun()
 
     # --- YENİ MÜŞTERİ ---
-    with tab_new:
+    elif tab == "➕ Yeni Müşteri":
         st.subheader("Yeni Müşteri Ekle")
         with st.form("new_customer_form", clear_on_submit=True):
             name    = st.text_input("Ad Soyad *", placeholder="Örn: Ahmet Yılmaz")
@@ -825,6 +688,7 @@ def render_customers():
                 else:
                     add_customer(name.strip(), phone.strip(), address.strip())
                     st.session_state["flash_success"] = f"✅ **{name}** başarıyla eklendi!"
+                    st.session_state["customers_tab"] = "📋 Müşteri Listesi"
                     st.rerun()
 
 
@@ -834,17 +698,35 @@ def render_customers():
 
 def render_oil_purchase():
     st.header("🛢️ Yağ Alım Kaydı")
-    st.caption("Müstahsilden gelen zeytinyağı alımlarını kaydedin")
     show_flash_message()
 
-    tab_new, tab_history = st.tabs(["➕ Yeni Alım", "📋 Alım Geçmişi"])
+    if "oil_tab" not in st.session_state:
+        st.session_state["oil_tab"] = "➕ Yeni Alım"
 
-    with tab_new:
+    tab = st.radio(
+        "Gezinme", ["➕ Yeni Alım", "📋 Alım Geçmişi"],
+        horizontal=True, key="oil_tab", label_visibility="collapsed",
+    )
+    st.divider()
+
+    if tab == "➕ Yeni Alım":
         customers = get_customers(only_active=True)
         if not customers:
             st.warning("⚠️ Aktif müşteri bulunamadı! Lütfen önce aktif bir müşteri ekleyin.")
         else:
-            cust_opts = {f"{c['name']} ({c['phone'] or 'Tel yok'})": c["id"] for c in customers}
+            cust_opts = {f"{c['name']} — {c['address'] or 'Adres yok'}": c["id"] for c in customers}
+
+            # Fotoğraf — form dışında (camera_input rerun sorunu)
+            st.markdown("##### 📸 Fotoğraf (Opsiyonel)")
+            photo_method = st.radio(
+                "Yöntem", ["📁 Dosyadan Yükle", "📸 Kameradan Çek"],
+                horizontal=True, key="oil_photo_method", label_visibility="collapsed",
+            )
+            if photo_method == "📁 Dosyadan Yükle":
+                st.file_uploader("Fotoğraf Seçin", type=["jpg", "jpeg", "png", "webp"], key="oil_photo_file")
+            else:
+                st.camera_input("📸 Fotoğraf Çekin", key="oil_camera")
+            st.divider()
 
             with st.form("new_oil_form", clear_on_submit=True):
                 selected   = st.selectbox("Müşteri Seçin *", list(cust_opts.keys()), index=None, placeholder="Lütfen Seçiniz")
@@ -854,19 +736,6 @@ def render_oil_purchase():
                 unit_price = st.number_input("KG Birim Fiyatı (₺) *", min_value=0.0, step=1.0, format="%.2f")
                 st.info("💡 Toplam tutar kayıt sırasında otomatik hesaplanır: KG × Birim Fiyat")
                 note = st.text_area("Not (Opsiyonel)", placeholder="Varsa açıklama yazın...")
-
-                # Fotoğraf — formun en altında, kaydet butonunun hemen üstünde
-                st.divider()
-                st.markdown("**📸 Fotoğraf (Opsiyonel)**")
-                photo_method = st.radio(
-                    "Yöntem", ["📁 Dosyadan Yükle", "📸 Kameradan Çek"],
-                    horizontal=True, key="oil_photo_method", label_visibility="collapsed",
-                )
-                photo_file = camera_photo = None
-                if photo_method == "📁 Dosyadan Yükle":
-                    photo_file = st.file_uploader("Fotoğraf Seçin", type=["jpg","jpeg","png","webp"], key="oil_photo_file")
-                else:
-                    camera_photo = st.camera_input("📸 Fotoğraf Çekin", key="oil_camera")
 
                 if st.form_submit_button("💾 Alımı Kaydet", use_container_width=True):
                     if not selected:
@@ -879,6 +748,8 @@ def render_oil_purchase():
                         cid = cust_opts[selected]
                         total = kg * unit_price
                         path = ""
+                        photo_file = st.session_state.get("oil_photo_file")
+                        camera_photo = st.session_state.get("oil_camera")
                         if photo_file:
                             path = save_uploaded_file(photo_file, "oil_photos")
                         elif camera_photo:
@@ -886,9 +757,12 @@ def render_oil_purchase():
                         who = st.session_state.get("username", "admin")
                         add_oil_purchase(cid, p_date.isoformat(), kg, acidity, unit_price, total, note, path, who)
                         st.session_state["flash_success"] = f"✅ {format_kg(kg)} yağ alımı kaydedildi! Toplam: {format_currency(total)}"
+                        st.session_state["oil_tab"] = "📋 Alım Geçmişi"
+                        st.session_state.pop("oil_photo_file", None)
+                        st.session_state.pop("oil_camera", None)
                         st.rerun()
 
-    with tab_history:
+    elif tab == "📋 Alım Geçmişi":
         all_custs = get_customers()
         filt = {"Tüm Müşteriler": None}
         filt.update({c["name"]: c["id"] for c in all_custs})
@@ -922,17 +796,23 @@ def render_oil_purchase():
 
 def render_payments():
     st.header("💸 Ödeme İşlemleri")
-    st.caption("Müşterilere yapılan ödemeleri kaydedin ve takip edin")
     show_flash_message()
 
-    tab_new, tab_history = st.tabs(["➕ Yeni Ödeme", "📋 Ödeme Geçmişi"])
+    if "pay_tab" not in st.session_state:
+        st.session_state["pay_tab"] = "➕ Yeni Ödeme"
 
-    with tab_new:
+    tab = st.radio(
+        "Gezinme", ["➕ Yeni Ödeme", "📋 Ödeme Geçmişi"],
+        horizontal=True, key="pay_tab", label_visibility="collapsed",
+    )
+    st.divider()
+
+    if tab == "➕ Yeni Ödeme":
         customers = get_customers(only_active=True)
         if not customers:
             st.warning("⚠️ Aktif müşteri bulunamadı! Lütfen önce aktif bir müşteri ekleyin.")
         else:
-            cust_opts = {f"{c['name']} ({c['phone'] or 'Tel yok'})": c["id"] for c in customers}
+            cust_opts = {f"{c['name']} — {c['address'] or 'Adres yok'}": c["id"] for c in customers}
             selected = st.selectbox("Müşteri Seçin *", list(cust_opts.keys()), index=None, placeholder="Lütfen Seçiniz", key="pay_customer")
 
             customer_id = None
@@ -941,31 +821,28 @@ def render_payments():
                 sums = get_customer_summary()
                 s = next((x for x in sums if x["id"] == customer_id), None)
                 if s:
-                    render_kpi_cards([
-                        {"icon": "💰", "label": "Hak Ediş",      "value": format_currency(s["total_purchase_amount"]), "color": "warning"},
-                        {"icon": "💸", "label": "Ödenen",         "value": format_currency(s["total_paid"]),             "color": "positive"},
-                        {"icon": "📋", "label": "Güncel Bakiye",  "value": format_currency(s["balance"]),
-                         "color": "negative" if s["balance"] > 0 else "positive"},
-                    ])
+                    mc1, mc2, mc3 = st.columns(3)
+                    mc1.metric("💰 Hak Ediş", format_currency(s["total_purchase_amount"]))
+                    mc2.metric("💸 Ödenen", format_currency(s["total_paid"]))
+                    mc3.metric("📋 Bakiye", format_currency(s["balance"]))
+
+            # Makbuz — form dışında (camera_input rerun sorunu)
+            st.markdown("##### 🧾 Makbuz Fotoğrafı (Opsiyonel)")
+            rcpt_method = st.radio(
+                "Yöntem", ["📁 Dosyadan Yükle", "📸 Kameradan Çek"],
+                horizontal=True, key="pay_rcpt_method", label_visibility="collapsed",
+            )
+            if rcpt_method == "📁 Dosyadan Yükle":
+                st.file_uploader("Makbuz Seçin", type=["jpg", "jpeg", "png", "webp"], key="pay_rcpt_file")
+            else:
+                st.camera_input("📸 Makbuz Çekin", key="pay_camera")
+            st.divider()
 
             with st.form("new_payment_form", clear_on_submit=True):
                 pay_date = st.date_input("Ödeme Tarihi *", value=date.today())
                 amount   = st.number_input("Ödenen Tutar (₺) *", min_value=0.0, step=100.0, format="%.2f")
                 pay_type = st.radio("Ödeme Türü *", ["Nakit", "Havale"], horizontal=True)
                 note     = st.text_area("Not (Opsiyonel)", placeholder="Varsa açıklama yazın...")
-
-                # Makbuz fotoğrafı — formun en altında, kaydet butonunun hemen üstünde
-                st.divider()
-                st.markdown("**🧾 Makbuz Fotoğrafı (Opsiyonel)**")
-                rcpt_method = st.radio(
-                    "Yöntem", ["📁 Dosyadan Yükle", "📸 Kameradan Çek"],
-                    horizontal=True, key="pay_rcpt_method", label_visibility="collapsed",
-                )
-                rcpt_file = rcpt_camera = None
-                if rcpt_method == "📁 Dosyadan Yükle":
-                    rcpt_file = st.file_uploader("Makbuz Seçin", type=["jpg","jpeg","png","webp"], key="pay_rcpt_file")
-                else:
-                    rcpt_camera = st.camera_input("📸 Makbuz Çekin", key="pay_camera")
 
                 if st.form_submit_button("💾 Ödemeyi Kaydet", use_container_width=True):
                     if not customer_id:
@@ -974,6 +851,8 @@ def render_payments():
                         st.error("Ödeme tutarı 0'dan büyük olmalıdır!")
                     else:
                         path = ""
+                        rcpt_file = st.session_state.get("pay_rcpt_file")
+                        rcpt_camera = st.session_state.get("pay_camera")
                         if rcpt_file:
                             path = save_uploaded_file(rcpt_file, "receipts")
                         elif rcpt_camera:
@@ -981,9 +860,12 @@ def render_payments():
                         who = st.session_state.get("username", "admin")
                         add_payment(customer_id, pay_date.isoformat(), amount, pay_type, note, path, who)
                         st.session_state["flash_success"] = f"✅ {format_currency(amount)} ödeme kaydedildi!"
+                        st.session_state["pay_tab"] = "📋 Ödeme Geçmişi"
+                        st.session_state.pop("pay_rcpt_file", None)
+                        st.session_state.pop("pay_camera", None)
                         st.rerun()
 
-    with tab_history:
+    elif tab == "📋 Ödeme Geçmişi":
         all_custs = get_customers()
         filt = {"Tüm Müşteriler": None}
         filt.update({c["name"]: c["id"] for c in all_custs})
@@ -1014,13 +896,19 @@ def render_payments():
 
 def render_warehouse():
     st.header("📦 Depo ve Satış")
-    st.caption("Stok durumunu takip edin ve satış kayıtlarını girin")
     show_flash_message()
 
-    tab_stock, tab_new_sale, tab_history = st.tabs(["📊 Stok Durumu", "➕ Yeni Satış", "📋 Satış Geçmişi"])
+    if "wh_tab" not in st.session_state:
+        st.session_state["wh_tab"] = "📊 Stok Durumu"
+
+    tab = st.radio(
+        "Gezinme", ["📊 Stok Durumu", "➕ Yeni Satış", "📋 Satış Geçmişi"],
+        horizontal=True, key="wh_tab", label_visibility="collapsed",
+    )
+    st.divider()
 
     # --- STOK ---
-    with tab_stock:
+    if tab == "📊 Stok Durumu":
         st.subheader("Depo Stok Durumu (Asit Bazında)")
         stock = get_stock_by_acidity()
         if not stock:
@@ -1029,33 +917,25 @@ def render_warehouse():
             tp = sum(r["purchased"] for r in stock)
             ts = sum(r["sold"] for r in stock)
             tn = sum(r["net_stock"] for r in stock)
-            render_kpi_cards([
-                {"icon": "🛢️", "label": "Toplam Alınan",  "value": format_kg(tp)},
-                {"icon": "🏷️", "label": "Toplam Satılan", "value": format_kg(ts), "color": "warning"},
-                {"icon": "📦", "label": "Depoda Kalan",    "value": format_kg(tn), "color": "info"},
-            ])
+            sc1, sc2, sc3 = st.columns(3)
+            sc1.metric("🛢️ Toplam Alınan", format_kg(tp))
+            sc2.metric("🏷️ Toplam Satılan", format_kg(ts))
+            sc3.metric("📦 Depoda Kalan", format_kg(tn))
             st.divider()
 
             for r in stock:
                 net = r["net_stock"]
                 icon = "🟢" if net > 0 else ("⚪" if net == 0 else "🔴")
-                with st.container(border=True):
-                    st.write(f"{icon} **Asit: %{r['acidity']}**")
-                    st.caption(
-                        f"Alınan: {format_kg(r['purchased'])}  ·  "
-                        f"Satılan: {format_kg(r['sold'])}  ·  "
-                        f"**Kalan: {format_kg(net)}**"
-                    )
-                    with st.expander("🔍 Kaynak Detaylarını Gör"):
-                        details = get_acidity_details(r["acidity"])
-                        if details:
-                            for d in details:
-                                st.write(f"- **{d['customer_name']}**: {format_kg(d['kg'])} ({d['purchase_date']})")
-                        else:
-                            st.caption("Detay bulunamadı.")
+                with st.expander(f"{icon} Asit: %{r['acidity']}  —  Kalan: {format_kg(net)}"):
+                    st.write(f"Alınan: {format_kg(r['purchased'])}  ·  Satılan: {format_kg(r['sold'])}")
+                    details = get_acidity_details(r["acidity"])
+                    if details:
+                        st.caption("**Kaynak Detayları:**")
+                        for d in details:
+                            st.write(f"- **{d['customer_name']}**: {format_kg(d['kg'])} ({d['purchase_date']})")
 
     # --- YENİ SATIŞ ---
-    with tab_new_sale:
+    elif tab == "➕ Yeni Satış":
         st.subheader("Yeni Satış Kaydı")
         stock = get_stock_by_acidity()
         avail = [r for r in stock if r["net_stock"] > 0]
@@ -1100,10 +980,11 @@ def render_warehouse():
                                 f"✅ Satış kaydedildi! {format_kg(s_kg)} (%{s_acid} asit) → "
                                 f"**{buyer}** · Toplam: {format_currency(total)}"
                             )
+                            st.session_state["wh_tab"] = "📋 Satış Geçmişi"
                             st.rerun()
 
     # --- SATIŞ GEÇMİŞİ ---
-    with tab_history:
+    elif tab == "📋 Satış Geçmişi":
         st.subheader("Satış Geçmişi")
         sales = get_sales()
         if not sales:
@@ -1131,32 +1012,33 @@ def render_warehouse():
 
 def render_customer_detail():
     st.header("🔎 Müşteri Detayı")
-    st.caption("Bir müşterinin tüm alım ve ödeme geçmişini görüntüleyin")
 
     customers = get_customers()
     if not customers:
         st.info("Henüz müşteri eklenmemiş.")
         return
 
-    opts = {c["name"]: c["id"] for c in customers}
+    opts = {f"{c['name']} — {c['address'] or 'Adres yok'}": c["id"] for c in customers}
     selected = st.selectbox("Müşteri Seçin", list(opts.keys()), key="detail_customer")
     cid = opts[selected]
 
     sums = get_customer_summary()
     summary = next((x for x in sums if x["id"] == cid), None)
     if summary:
-        render_kpi_cards([
-            {"icon": "🛢️", "label": "Toplam Yağ", "value": format_kg(summary["total_kg"])},
-            {"icon": "💰", "label": "Hak Ediş",   "value": format_currency(summary["total_purchase_amount"]), "color": "warning"},
-            {"icon": "💸", "label": "Ödenen",      "value": format_currency(summary["total_paid"]),            "color": "positive"},
-            {"icon": "📋", "label": "Bakiye",      "value": format_currency(summary["balance"]),
-             "color": "negative" if summary["balance"] > 0 else "positive"},
-        ])
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        mc1.metric("🛢️ Toplam Yağ", format_kg(summary["total_kg"]))
+        mc2.metric("💰 Hak Ediş", format_currency(summary["total_purchase_amount"]))
+        mc3.metric("💸 Ödenen", format_currency(summary["total_paid"]))
+        mc4.metric("📋 Bakiye", format_currency(summary["balance"]))
 
     st.divider()
-    t1, t2 = st.tabs(["🛢️ Yağ Alımları", "💸 Ödemeler"])
 
-    with t1:
+    detail_tab = st.radio(
+        "Gezinme", ["🛢️ Yağ Alımları", "💸 Ödemeler"],
+        horizontal=True, key="detail_tab", label_visibility="collapsed",
+    )
+
+    if detail_tab == "🛢️ Yağ Alımları":
         purchases = get_oil_purchases(cid)
         if not purchases:
             st.info("Bu müşteriye ait alım kaydı yok.")
@@ -1171,7 +1053,7 @@ def render_customer_detail():
                     if p["note"]:
                         st.caption(f"📝 {p['note']}")
 
-    with t2:
+    elif detail_tab == "💸 Ödemeler":
         payments = get_payments(cid)
         if not payments:
             st.info("Bu müşteriye ait ödeme kaydı yok.")
@@ -1190,11 +1072,15 @@ def render_customer_detail():
 
 def render_settings_users():
     st.header("⚙️ Ayarlar / Kullanıcılar")
-    st.caption("Kullanıcıları yönetin ve şifrenizi güncelleyin")
+    show_flash_message()
 
-    tab_users, tab_profile = st.tabs(["👥 Sistem Kullanıcıları", "🔑 Profilimi Güncelle"])
+    settings_tab = st.radio(
+        "Gezinme", ["👥 Sistem Kullanıcıları", "🔑 Profilimi Güncelle"],
+        horizontal=True, key="settings_tab", label_visibility="collapsed",
+    )
+    st.divider()
 
-    with tab_users:
+    if settings_tab == "👥 Sistem Kullanıcıları":
         st.subheader("Mevcut Kullanıcılar")
         users = get_users()
         for u in users:
@@ -1221,7 +1107,7 @@ def render_settings_users():
                 else:
                     st.error("Bu kullanıcı adı zaten mevcut.")
 
-    with tab_profile:
+    elif settings_tab == "🔑 Profilimi Güncelle":
         st.subheader("Şifremi Değiştir")
         with st.form("change_pw_form", clear_on_submit=True):
             cur_user = next((u for u in get_users() if u["username"] == st.session_state.get("username")), None)
@@ -1250,13 +1136,13 @@ def render_settings_users():
 # ============================================================
 
 MENU_ITEMS = [
-    {"key": "dashboard",       "icon": "📊", "label": "Genel Bakış"},
-    {"key": "customers",       "icon": "👥", "label": "Müşteriler"},
-    {"key": "oil_purchase",    "icon": "🛢️", "label": "Yağ Alımı"},
-    {"key": "payments",        "icon": "💸", "label": "Ödemeler"},
-    {"key": "warehouse",       "icon": "📦", "label": "Depo ve Satış"},
-    {"key": "customer_detail", "icon": "🔎", "label": "Müşteri Detayı"},
-    {"key": "settings",        "icon": "⚙️", "label": "Ayarlar"},
+    {"key": "dashboard",       "label": "📊 Genel Bakış"},
+    {"key": "customers",       "label": "👥 Müşteriler"},
+    {"key": "oil_purchase",    "label": "🛢️ Yağ Alımı"},
+    {"key": "payments",        "label": "💸 Ödemeler"},
+    {"key": "warehouse",       "label": "📦 Depo/Satış"},
+    {"key": "customer_detail", "label": "🔎 Detay"},
+    {"key": "settings",        "label": "⚙️ Ayarlar"},
 ]
 
 PAGE_RENDERERS = {
@@ -1304,21 +1190,12 @@ def main():
         render_login()
         return
 
-    if "active_page" not in st.session_state:
-        st.session_state["active_page"] = "dashboard"
-
-    # --- SIDEBAR: sadece marka + kullanıcı bilgisi + çıkış ---
+    # --- SIDEBAR: marka + kullanıcı bilgisi + çıkış ---
     with st.sidebar:
-        st.markdown("""
-        <div class="brand-header">
-            <div class="brand-name">🫒 Olivarda</div>
-            <div class="brand-subtitle">Erengül Zeytinyağı Ticareti</div>
-            <div class="brand-divider"></div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.write("")
+        st.markdown("### 🫒 Olivarda")
+        st.caption("Erengül Zeytinyağı Ticareti")
         st.divider()
-        st.caption(f"👤 {st.session_state.get('username', 'admin')}")
+        st.write(f"👤 **{st.session_state.get('username', 'admin')}**")
         st.caption(f"🕐 {datetime.now().strftime('%d.%m.%Y %H:%M')}")
         st.divider()
 
@@ -1332,31 +1209,31 @@ def main():
                 pass
             st.session_state["authenticated"] = False
             st.session_state.pop("username", None)
-            st.session_state.pop("active_page", None)
             st.rerun()
 
-        st.markdown("""
-        <div class="sidebar-footer">
-            © 2026 Olivarda — Erengül Zeytinyağı Ticareti
-        </div>
-        """, unsafe_allow_html=True)
+        st.caption("© 2026 Olivarda")
 
-    # --- ANA SAYFA MENÜSÜ (selectbox — mobilde sidebar'a gerek kalmaz) ---
-    menu_labels = [f"{item['icon']}  {item['label']}" for item in MENU_ITEMS]
-    current_idx = next(
-        (i for i, item in enumerate(MENU_ITEMS) if item["key"] == st.session_state["active_page"]), 0
+    # --- ANA MENÜ (radio horizontal — mobilde sidebar'a gerek kalmaz) ---
+    menu_labels = [item["label"] for item in MENU_ITEMS]
+    menu_keys = [item["key"] for item in MENU_ITEMS]
+
+    # Mevcut aktif sayfanın index'ini bul
+    current_key = st.session_state.get("active_page", "dashboard")
+    current_idx = menu_keys.index(current_key) if current_key in menu_keys else 0
+
+    selected_label = st.radio(
+        "Ana Menü", menu_labels, index=current_idx,
+        horizontal=True, key="main_menu_radio", label_visibility="collapsed",
     )
-    selected_menu = st.selectbox(
-        "📌 İşlem Seçin", menu_labels, index=current_idx, key="main_menu"
-    )
-    new_page = MENU_ITEMS[menu_labels.index(selected_menu)]["key"]
-    if new_page != st.session_state["active_page"]:
-        st.session_state["active_page"] = new_page
+    new_key = menu_keys[menu_labels.index(selected_label)]
+    if new_key != st.session_state.get("active_page", "dashboard"):
+        st.session_state["active_page"] = new_key
         st.rerun()
+    st.session_state["active_page"] = new_key
     st.divider()
 
     # --- SAYFA RENDER ---
-    renderer = PAGE_RENDERERS.get(st.session_state["active_page"], render_dashboard)
+    renderer = PAGE_RENDERERS.get(new_key, render_dashboard)
     renderer()
 
 
