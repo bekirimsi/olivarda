@@ -165,7 +165,8 @@ st.markdown(f"""
 # ============================================================
 
 def get_cookie_manager():
-    return stx.CookieManager(key="olivarda_cookies")
+    """session_state'te saklanan tek CookieManager instance'ını döndürür."""
+    return st.session_state.get("_cookie_manager")
 
 
 def render_kpi_cards(cards: list):
@@ -1278,21 +1279,24 @@ def main():
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     cleanup_expired_tokens()
 
+    # CookieManager — her render döngüsünde TEK SEFER oluşturulur
+    cookie_manager = stx.CookieManager(key="olivarda_cookies")
+    st.session_state["_cookie_manager"] = cookie_manager
+
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
 
     # Cookie'den otomatik giriş
     if not st.session_state["authenticated"]:
         try:
-            cm = get_cookie_manager()
-            token = cm.get("olivarda_auth_token")
+            token = cookie_manager.get("olivarda_auth_token")
             if token:
                 uname = verify_auth_token(token)
                 if uname:
                     st.session_state["authenticated"] = True
                     st.session_state["username"] = uname
                 else:
-                    cm.delete("olivarda_auth_token")
+                    cookie_manager.delete("olivarda_auth_token")
         except Exception:
             pass
 
@@ -1329,11 +1333,10 @@ def main():
 
         if st.button("🚪 Çıkış Yap", use_container_width=True):
             try:
-                cm = get_cookie_manager()
-                tok = cm.get("olivarda_auth_token")
+                tok = cookie_manager.get("olivarda_auth_token")
                 if tok:
                     delete_auth_token(tok)
-                cm.delete("olivarda_auth_token")
+                cookie_manager.delete("olivarda_auth_token")
             except Exception:
                 pass
             st.session_state["authenticated"] = False
