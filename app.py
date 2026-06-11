@@ -696,13 +696,13 @@ def render_login():
             return
         conn = get_db()
         user = conn.execute(
-            "SELECT * FROM users WHERE username=? AND password_hash=?",
+            "SELECT * FROM users WHERE LOWER(username)=LOWER(?) AND password_hash=?",
             (username, hash_password(password)),
         ).fetchone()
         conn.close()
         if user:
             st.session_state["authenticated"] = True
-            st.session_state["username"] = username
+            st.session_state["username"] = user["username"]
             if remember_me:
                 token = create_auth_token(username)
                 cookie_manager.set(
@@ -846,19 +846,6 @@ def render_oil_purchase():
         else:
             cust_opts = {f"{c['name']} ({c['phone'] or 'Tel yok'})": c["id"] for c in customers}
 
-            # Fotoğraf — form dışında (camera_input form içinde çalışmaz)
-            st.subheader("📸 Fotoğraf (Opsiyonel)")
-            photo_method = st.radio(
-                "Yöntem", ["📁 Dosyadan Yükle", "📸 Kameradan Çek"],
-                horizontal=True, key="oil_photo_method", label_visibility="collapsed",
-            )
-            photo_file = camera_photo = None
-            if photo_method == "📁 Dosyadan Yükle":
-                photo_file = st.file_uploader("Fotoğraf Seçin", type=["jpg","jpeg","png","webp"], key="oil_photo_file")
-            else:
-                camera_photo = st.camera_input("📸 Fotoğraf Çekin", key="oil_camera")
-            st.divider()
-
             with st.form("new_oil_form", clear_on_submit=True):
                 selected   = st.selectbox("Müşteri Seçin *", list(cust_opts.keys()), index=None, placeholder="Lütfen Seçiniz")
                 p_date     = st.date_input("Tarih *", value=date.today())
@@ -867,6 +854,19 @@ def render_oil_purchase():
                 unit_price = st.number_input("KG Birim Fiyatı (₺) *", min_value=0.0, step=1.0, format="%.2f")
                 st.info("💡 Toplam tutar kayıt sırasında otomatik hesaplanır: KG × Birim Fiyat")
                 note = st.text_area("Not (Opsiyonel)", placeholder="Varsa açıklama yazın...")
+
+                # Fotoğraf — formun en altında, kaydet butonunun hemen üstünde
+                st.divider()
+                st.markdown("**📸 Fotoğraf (Opsiyonel)**")
+                photo_method = st.radio(
+                    "Yöntem", ["📁 Dosyadan Yükle", "📸 Kameradan Çek"],
+                    horizontal=True, key="oil_photo_method", label_visibility="collapsed",
+                )
+                photo_file = camera_photo = None
+                if photo_method == "📁 Dosyadan Yükle":
+                    photo_file = st.file_uploader("Fotoğraf Seçin", type=["jpg","jpeg","png","webp"], key="oil_photo_file")
+                else:
+                    camera_photo = st.camera_input("📸 Fotoğraf Çekin", key="oil_camera")
 
                 if st.form_submit_button("💾 Alımı Kaydet", use_container_width=True):
                     if not selected:
@@ -948,24 +948,24 @@ def render_payments():
                          "color": "negative" if s["balance"] > 0 else "positive"},
                     ])
 
-            # Makbuz — form dışında (kamera desteği)
-            st.subheader("🧾 Makbuz Fotoğrafı (Opsiyonel)")
-            rcpt_method = st.radio(
-                "Yöntem", ["📁 Dosyadan Yükle", "📸 Kameradan Çek"],
-                horizontal=True, key="pay_rcpt_method", label_visibility="collapsed",
-            )
-            rcpt_file = rcpt_camera = None
-            if rcpt_method == "📁 Dosyadan Yükle":
-                rcpt_file = st.file_uploader("Makbuz Seçin", type=["jpg","jpeg","png","webp"], key="pay_rcpt_file")
-            else:
-                rcpt_camera = st.camera_input("📸 Makbuz Çekin", key="pay_camera")
-            st.divider()
-
             with st.form("new_payment_form", clear_on_submit=True):
                 pay_date = st.date_input("Ödeme Tarihi *", value=date.today())
                 amount   = st.number_input("Ödenen Tutar (₺) *", min_value=0.0, step=100.0, format="%.2f")
                 pay_type = st.radio("Ödeme Türü *", ["Nakit", "Havale"], horizontal=True)
                 note     = st.text_area("Not (Opsiyonel)", placeholder="Varsa açıklama yazın...")
+
+                # Makbuz fotoğrafı — formun en altında, kaydet butonunun hemen üstünde
+                st.divider()
+                st.markdown("**🧾 Makbuz Fotoğrafı (Opsiyonel)**")
+                rcpt_method = st.radio(
+                    "Yöntem", ["📁 Dosyadan Yükle", "📸 Kameradan Çek"],
+                    horizontal=True, key="pay_rcpt_method", label_visibility="collapsed",
+                )
+                rcpt_file = rcpt_camera = None
+                if rcpt_method == "📁 Dosyadan Yükle":
+                    rcpt_file = st.file_uploader("Makbuz Seçin", type=["jpg","jpeg","png","webp"], key="pay_rcpt_file")
+                else:
+                    rcpt_camera = st.camera_input("📸 Makbuz Çekin", key="pay_camera")
 
                 if st.form_submit_button("💾 Ödemeyi Kaydet", use_container_width=True):
                     if not customer_id:
@@ -1307,7 +1307,7 @@ def main():
     if "active_page" not in st.session_state:
         st.session_state["active_page"] = "dashboard"
 
-    # --- SIDEBAR ---
+    # --- SIDEBAR: sadece marka + kullanıcı bilgisi + çıkış ---
     with st.sidebar:
         st.markdown("""
         <div class="brand-header">
@@ -1318,18 +1318,9 @@ def main():
         """, unsafe_allow_html=True)
         st.write("")
         st.divider()
-
-        for item in MENU_ITEMS:
-            is_active = st.session_state["active_page"] == item["key"]
-            label = f"{item['icon']}  {item['label']}"
-            if st.button(label, key=f"menu_{item['key']}", use_container_width=True,
-                         type="primary" if is_active else "secondary"):
-                st.session_state["active_page"] = item["key"]
-                st.rerun()
-
-        st.divider()
         st.caption(f"👤 {st.session_state.get('username', 'admin')}")
         st.caption(f"🕐 {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+        st.divider()
 
         if st.button("🚪 Çıkış Yap", use_container_width=True):
             try:
@@ -1349,6 +1340,20 @@ def main():
             © 2026 Olivarda — Erengül Zeytinyağı Ticareti
         </div>
         """, unsafe_allow_html=True)
+
+    # --- ANA SAYFA MENÜSÜ (selectbox — mobilde sidebar'a gerek kalmaz) ---
+    menu_labels = [f"{item['icon']}  {item['label']}" for item in MENU_ITEMS]
+    current_idx = next(
+        (i for i, item in enumerate(MENU_ITEMS) if item["key"] == st.session_state["active_page"]), 0
+    )
+    selected_menu = st.selectbox(
+        "📌 İşlem Seçin", menu_labels, index=current_idx, key="main_menu"
+    )
+    new_page = MENU_ITEMS[menu_labels.index(selected_menu)]["key"]
+    if new_page != st.session_state["active_page"]:
+        st.session_state["active_page"] = new_page
+        st.rerun()
+    st.divider()
 
     # --- SAYFA RENDER ---
     renderer = PAGE_RENDERERS.get(st.session_state["active_page"], render_dashboard)
